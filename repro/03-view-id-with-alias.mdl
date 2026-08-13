@@ -1,0 +1,18 @@
+-- Reproduction: view entity ID column without an alias
+-- Step 3 — the CONTROL: the same view with an explicit alias on the ID column.
+--
+-- This is the shape mxcli allows and it is expected to work at runtime. The
+-- customer's shape (bare `o.ID`, no alias) is produced from this one by
+-- repro/patch-drop-alias.py, because mxcli rejects it up front with MDL030 even
+-- though Studio Pro and the Mendix docs allow it.
+
+CREATE OR MODIFY VIEW ENTITY Repro.OrderView (
+  OrderNumber: string(20),
+  Amount: decimal
+) AS (
+  SELECT
+    o.ID AS OrderView_SalesOrder,
+    o.OrderNumber AS OrderNumber,
+    o.Amount AS Amount
+  FROM Repro.SalesOrder AS o
+);

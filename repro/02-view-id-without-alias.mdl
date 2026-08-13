@@ -1,0 +1,20 @@
+-- Reproduction: view entity ID column without an alias
+-- Step 2 — the customer's case.
+--
+-- The view selects o.ID with NO alias. Per the Mendix docs the alias on an ID
+-- column is optional ("a default name following the association naming convention
+-- will be applied"), so this is supposed to be legal and to yield a navigable
+-- association from the view entity to Repro.Order — the dashed line in the domain
+-- model. The customer reports no design-time error here, and a runtime failure
+-- when retrieving over that association.
+
+CREATE OR MODIFY VIEW ENTITY Repro.OrderView (
+  OrderNumber: string(20),
+  Amount: decimal
+) AS (
+  SELECT
+    o.ID,
+    o.OrderNumber AS OrderNumber,
+    o.Amount AS Amount
+  FROM Repro.Order AS o
+);
