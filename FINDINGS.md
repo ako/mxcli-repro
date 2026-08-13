@@ -62,6 +62,64 @@ spend time on it.
 *Verified:* branch push in the same shell succeeded (`09fa266..234e412`);
 `git ls-remote --tags origin` lists no `baseline`.
 
+### mxcli rejects an un-aliased ID column in a view entity (MDL030), which Mendix allows
+
+`mxcli check`/`exec` refuse any view-entity select column without an alias:
+
+```
+✗ select column 1 has no as alias: 'o.ID' [MDL030]
+  → All select columns in a view entity must have an explicit alias
+```
+
+For ordinary columns that matches Mendix. For **ID columns** it does not: the Mendix
+docs say the alias is optional there and a default association name is applied
+(<https://docs.mendix.com/refguide/view-entities/>). The blanket rule means a model
+that a customer *can* build in Studio Pro cannot be expressed in MDL — which is
+exactly the model a reproduction needs. Suggest exempting `.ID` columns from MDL030,
+or downgrading it to a warning.
+
+(Separately: on 11.13.0 `mx check` *also* rejects the un-aliased ID column — CE0174,
+"The name cannot be empty" — so on this version mxcli and mxbuild agree in outcome,
+just not for a documented reason. See `repro/NOTES.md`.)
+
+*Verified:* `./mxcli exec repro/02-view-id-without-alias.mdl` errors with MDL030;
+`mx check` on the same shape (written by patching the .mpr) errors with CE0174.
+
+### No MDL syntax for a view entity's association; CREATE ASSOCIATION writes an invalid one
+
+Selecting an ID column in a view entity gives the view an association to the source
+entity (the dashed line in the domain model). MDL cannot create it:
+
+```sql
+CREATE ASSOCIATION Repro.OrderView_SalesOrder FROM Repro.OrderView TO Repro.SalesOrder
+  TYPE Reference OWNER Default;
+```
+
+succeeds in mxcli but produces `mx check` errors CE6771 ("It is not possible to create
+associations to/from View Entities") and CE6770 ("View Entity is out of sync with the
+OQL Query"). The difference is the association's `Source`: mxcli writes `null`, while
+Studio Pro writes `DomainModels$OqlViewAssociationSource { Reference: "<column alias>" }`.
+
+So a view entity created by mxcli with an ID column in its query is **always**
+inconsistent — the OQL references an association that does not exist (CE1613, "The
+selected association … no longer exists"). Worth supporting, e.g.
+`CREATE VIEW ENTITY … ASSOCIATION Name -> Module.Entity FROM COLUMN alias`.
+
+*Verified:* built both shapes; the hand-patched `OqlViewAssociationSource` version
+passes `mx check` with 0 errors and serves data over the association at runtime, so
+the missing piece really is just that source object. `repro/mprlib.py` and
+`repro/patch-view-assoc.py` show the BSON.
+
+### `Order` is an OQL reserved word — an entity named `Order` breaks view queries
+
+`from Repro.Order as o` inside a view entity fails `mx check` with CE0174 ("The 'Order'
+part is incomplete or incorrect … The 'AS' part is incomplete or incorrect. You could
+use here: BY."). `mxcli check` passes it. Quoting (`Repro."Order"`) or a different
+entity name is the fix; `mxcli syntax domain-model.keywords` documents quoting but
+does not list `Order`, and the MDL check does not catch it.
+
+*Verified:* renamed the entity to `SalesOrder` and the same query checks clean.
+
 ### Blank app boots clean on 11.13.0
 
 `./mxcli run --local -p ReproApp.mpr` cold-built and served in about a minute, no
