@@ -120,6 +120,57 @@ does not list `Order`, and the MDL check does not catch it.
 
 *Verified:* renamed the entity to `SalesOrder` and the same query checks clean.
 
+### mxcli cannot resolve Mendix 10 versions (needs the 4-part build number)
+
+`./mxcli setup mxbuild --version 10.24.24` builds
+`https://cdn.mendix.com/runtime/mxbuild-10.24.24.tar.gz` and gets a genuine S3
+`NoSuchKey`. Mendix 10 artifacts on the CDN carry a build number —
+`mxbuild-10.24.24.119653.tar.gz` — while Mendix 11 uses the plain 3-part version.
+Passing the full 4-part version works everywhere (`setup mxbuild`, `setup mxruntime`,
+`new`, and it lands in the `.mpr` as the project version).
+
+Finding the build number needs a bucket listing, which is not obvious:
+
+```bash
+curl -s "https://cdn.mendix.com/?list-type=2&prefix=runtime/mxbuild-10.24&max-keys=1000"
+```
+
+mxcli could do this itself: on a 404, list the prefix and pick the highest build for
+the requested patch (or tell the user the 4-part versions available).
+
+*Verified:* 3-part 404s for 10.24.x, 10.18.0 and 9.24.0 but 200s for 11.13.0; the
+4-part `10.24.24.119653` downloaded and built a working project.
+
+### mxcli's DATAGRID writes a DataGrid2 whose filters break the app at runtime
+
+A page written by MDL like
+
+```sql
+DATAGRID dgOrders (DataSource: DATABASE Repro.OrderView) {
+  COLUMN colNumber (Attribute: OrderNumber, Caption: 'View order #')
+}
+```
+
+passes `mx check` with **0 errors** but 500s the moment a user opens it. The runtime
+receives an XPath with BSON array markers leaked into it as string literals:
+
+```
+{"xpath":"//Repro.OrderView[(('[3,[]]' != '#') and ('[0,[]]' != '#'))]", …}
+Caused by: java.lang.IllegalArgumentException: requirement failed: Entity id should be not zero
+```
+
+`'[3,[]]'` is an array version marker (`debug-bson.md`) that has been serialized into
+the widget's filter configuration instead of a real value. A `LISTVIEW` over the same
+datasource produces a clean `//Repro.OrderView` and works, so the fault is in the
+DataGrid2 filter/property serialization, not the datasource.
+
+This one is expensive for an agent: the page checks clean, so the failure only shows
+in a browser, and it looks exactly like a data/model bug. It cost a false
+"reproduced" conclusion in `repro/NOTES.md` before the control run caught it.
+
+*Verified:* same page, same data, DATAGRID → 560 + the marker XPath; LISTVIEW →
+renders. Mendix 10.24.24, DataWidgets from the blank template.
+
 ### Blank app boots clean on 11.13.0
 
 `./mxcli run --local -p ReproApp.mpr` cold-built and served in about a minute, no

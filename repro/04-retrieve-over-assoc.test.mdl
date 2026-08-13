@@ -1,0 +1,12 @@
+-- Reproduction: view entity ID column without an alias
+-- Step 4b — the runtime half.
+--
+-- Needs repro/04-retrieve-microflow.mdl executed into the project first.
+-- Run: ./mxcli test repro/04-retrieve-over-assoc.test.mdl -p <app>.mpr --local
+
+/**
+ * @test retrieve over a view entity's association
+ * @expect $result = 'SO-1'
+ */
+$result = CALL MICROFLOW Repro.ACT_RetrieveOverViewAssociation();
+/

@@ -9,11 +9,83 @@
 > missing the alias. It's weird that forgetting an alias does raise errors for any
 > other column, but no error is raised when it's forgotten for assocation/ID columns.
 
-**Verdict: does not reproduce on Mendix 11.13.0.** The missing alias on an ID column
-*is* reported at design time (CE0174) and the app **cannot be deployed** — so the
-runtime failure they describe is unreachable on this version. The asymmetry they
-describe (error for ordinary columns, silence for ID columns) is not present: both
-are errors, with different messages.
+**Verdict: reproduces on 10.24.24, fixed by 11.13.0.**
+
+- On **10.24.24** the un-aliased ID column passes the consistency check with **0
+  errors** and the association is in the domain model — exactly the silent
+  design-time behaviour the customer describes.
+- On **11.13.0** the same model is rejected with **CE0174** ("The name cannot be
+  empty") and the app **cannot be deployed**, so the runtime failure is unreachable
+  there. The asymmetry the customer describes is not present on 11.13.0 either: an
+  un-aliased ordinary column errors too, with a different message.
+
+| Model shape | 10.24.24 | 11.13.0 |
+|---|---|---|
+| `o.ID AS OrderView_SalesOrder` (ID aliased) | 0 errors | 0 errors |
+| `o.ID` bare + association named by convention | **0 errors** | **CE0174** (blocks build) |
+| `o.ID` bare + association with no reference | CE6770 "out of sync" | CE0174 |
+| `o.OrderNumber` (ordinary column, not aliased) | see below | CE0174 |
+
+Upgrading past 10.24 therefore turns this from a silent runtime failure into a build
+error — which is the fix, and the advice for the customer.
+
+### The runtime half is NOT established
+
+On 10.24.24, with the un-aliased model deployed and one Customer + one SalesOrder in
+the database:
+
+| retrieval path | un-aliased | aliased (control) |
+|---|---|---|
+| OQL join over the association (`mxcli oql`) | works | works |
+| microflow `RETRIEVE $Source FROM $View/Repro.OrderView_SalesOrder` | works (`mxcli test` PASS) | works |
+| client retrieve (page over the association) | fails, 560 | **also fails, identically** |
+
+The client retrieve fails the same way with the alias present, so it does **not**
+discriminate between the two states and is not evidence of the customer's bug. Both
+give:
+
+```
+WebUIException: Exception while retrieving data for 'Repro.OrderOverview.lvOrders'
+Caused by: CoreRuntimeException: action '{"xpath":"//Repro.OrderView", …
+    "type":"RetrieveXPathSchemaRawAction"}'
+Caused by: ConnectionBusRuntimeException: …
+Caused by: java.lang.IllegalArgumentException: requirement failed: Entity id should be not zero
+```
+
+An isolation run pins the cause on the reconstruction: a plain mxcli-built view entity
+— no ID column, no association, same LISTVIEW page — renders fine in the browser
+(`view order SO-1`, no console errors, no 4xx/5xx). Client retrieve of a view entity
+therefore works; it breaks exactly when the hand-written association is in the model,
+aliased or not.
+
+So the hand-written `OqlViewAssociationSource` is incomplete in some way the client
+retrieve depends on but `mx check`, OQL and microflow retrieval do not — it satisfies
+all three of those and still breaks the client.
+
+**So the runtime failure the customer reports is unconfirmed here.** What is confirmed
+is the design-time half, and the version difference.
+
+Two traps found on the way, both worth remembering before trusting any probe here:
+
+- `DATAGRID` in MDL writes a DataWidgets **DataGrid2** custom widget whose filter
+  config serializes wrongly; the runtime then builds a nonsense XPath containing BSON
+  array markers — `//Repro.OrderView[(('[3,[]]' != '#') and ('[0,[]]' != '#'))]` —
+  and fails with the same "Entity id should be not zero", with or without the alias.
+  A first pass with that page looked like a reproduction and was not. `LISTVIEW` +
+  `DYNAMICTEXT` produces a clean `//Repro.OrderView` XPath, and was used instead.
+- Probing only with OQL or a microflow would have suggested the un-aliased model is
+  fine; probing only with a grid would have suggested it is broken. Neither is sound
+  without the aliased control run alongside.
+
+### What would settle it
+
+The customer's own artifact: their `.mpr` (or the view entity's OQL plus which widget
+or microflow was retrieving), and the exact error text from their log. With their
+`.mpr` the association BSON can be diffed against `repro/patch-view-assoc.py`'s to
+see what Studio Pro writes that this reconstruction does not.
+
+Everything below refers to 11.13.0 unless it says otherwise; the 10.24 app lives in
+`Repro1024/` and is driven by the same scripts with `MPR=Repro1024/Repro1024.mpr`.
 
 ## Model used
 

@@ -1,0 +1,28 @@
+-- Reproduction: view entity ID column without an alias
+-- Step 5 — the client path: a page that reads an attribute OVER the association
+-- the un-aliased ID column created. This is what a deployed app does when a user
+-- opens the screen — the third retrieval path, after an OQL join and a microflow
+-- retrieve-by-association.
+--
+-- LISTVIEW, not DATAGRID: mxcli's DATAGRID writes a DataWidgets DataGrid2 custom
+-- widget whose filter config serializes wrongly, and the runtime then builds a
+-- nonsense XPath containing BSON array markers ('[3,[]]' != '#'), which fails
+-- with or without the alias. That is an mxcli page bug, not this one — see
+-- FINDINGS.md. LISTVIEW is a core widget and retrieves cleanly.
+
+CREATE OR MODIFY PAGE Repro.OrderOverview
+  (
+    Title: 'Order overview',
+    Layout: Atlas_Core.Atlas_Default,
+    Url: 'orders'
+  )
+  {
+    LISTVIEW lvOrders (DataSource: DATABASE Repro.OrderView) {
+      DYNAMICTEXT txtView (Content: 'view order {1}', ContentParams: [{1} = OrderNumber])
+      -- The line under test: an attribute reached over the view association.
+      DYNAMICTEXT txtSource (Content: 'source order {1}', ContentParams: [{1} = OrderView_SalesOrder/OrderNumber])
+    }
+  }
+
+CREATE OR REPLACE NAVIGATION Responsive
+  HOME PAGE Repro.OrderOverview;
