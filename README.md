@@ -42,12 +42,18 @@ non-security repro is not muddied by it.
 
 ## Resetting between reproductions
 
-The clean app is committed and tagged **`baseline`**. To throw a reproduction away:
+The clean app is commit **`234e412`** ("Provision blank Mendix 11.13.0 app ReproApp as
+the reproduction baseline"). To throw a reproduction away:
 
 ```bash
-git reset --hard baseline && git clean -fd    # back to the blank app
+git reset --hard 234e412 && git clean -fd    # back to the blank app
 ./mxcli run --local --setup --ensure-db -p ReproApp.mpr
 ```
+
+A local tag `baseline` points at that commit for convenience, so `git reset --hard
+baseline` works in this working copy. The tag is **not** on the remote — this session's
+git proxy rejects tag pushes with HTTP 403 — so in a fresh clone use the SHA, or
+re-create the tag with `git tag baseline 234e412`.
 
 `git clean -fd` removes any files a reproduction added; it leaves git-ignored files
 such as the `mxcli` binary and the MxBuild caches alone, which is what you want.

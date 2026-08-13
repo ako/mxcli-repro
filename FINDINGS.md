@@ -50,3 +50,20 @@ Working around it with `dropdb`/`createdb` (documented in `README.md`).
 
 *Verified:* `./mxcli run --help` lists only `--db-host/--db-name/--db-user/
 --db-password/--ensure-db/--setup`.
+
+### Tag pushes are blocked in the Claude Code cloud session (environment, not mxcli)
+
+`git push origin refs/tags/baseline` fails with `error: RPC failed; HTTP 403` from the
+session's git proxy, while pushing the branch itself succeeds. So the baseline is
+pinned by commit SHA (`234e412`) in `README.md` rather than by a pushed tag; the local
+tag exists but stays local. Not an mxcli issue — noted so the next session does not
+spend time on it.
+
+*Verified:* branch push in the same shell succeeded (`09fa266..234e412`);
+`git ls-remote --tags origin` lists no `baseline`.
+
+### Blank app boots clean on 11.13.0
+
+`./mxcli run --local -p ReproApp.mpr` cold-built and served in about a minute, no
+build errors; `GET http://localhost:8080/` returns **200**. That is the known-good
+starting point every reproduction should be compared against.
