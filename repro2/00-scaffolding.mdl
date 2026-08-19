@@ -1,0 +1,45 @@
+-- Ticket 2 scaffolding — the surroundings the customer's script assumes.
+--
+-- Their aiadvisorsessionresume.mdl references MxCore, HomeScan and WhiteLabel, a
+-- HomeScan entity with HashedID/AgentSessionID, and a SUB_ microflow returning an
+-- object with Text..Text4. None of that is the subject of the ticket; it only has to
+-- exist so their script applies cleanly.
+
+CREATE MODULE MxCore;
+CREATE MODULE WhiteLabel;
+CREATE MODULE HomeScan;
+
+@position(100, 100)
+CREATE PERSISTENT ENTITY WhiteLabel."Brand" (
+  "Name": String(100)
+);
+
+@position(100, 100)
+CREATE PERSISTENT ENTITY HomeScan."HomeScan" (
+  "HashedID": String(100),
+  "AgentSessionID": String(100)
+);
+
+@position(400, 100)
+CREATE NON-PERSISTENT ENTITY HomeScan."TextHelper" (
+  "Text": String(500),
+  "Text2": String(500),
+  "Text3": String(500),
+  "Text4": String(500)
+);
+
+CREATE OR MODIFY MICROFLOW HomeScan."SUB_HomeScan_AiAdvisorSettings" (
+  $HomeScan: HomeScan.HomeScan,
+  $Brand: WhiteLabel.Brand
+)
+RETURNS HomeScan.TextHelper AS $Helper
+BEGIN
+  $Helper = CREATE HomeScan."TextHelper" (
+    "Text" = 'https://chatbot.example.com/api',
+    "Text2" = 'demo-api-key',
+    "Text3" = '#94fc1c',
+    "Text4" = 'https://example.com/avatar.png'
+  );
+  RETURN $Helper;
+END;
+/

@@ -1,0 +1,18 @@
+-- Ticket 2 — is the wholesale rewrite specific to nanoflows?
+-- Same microflow as the scaffolding, one literal changed ('demo-api-key' -> v2).
+
+CREATE OR MODIFY MICROFLOW HomeScan."SUB_HomeScan_AiAdvisorSettings" (
+  $HomeScan: HomeScan.HomeScan,
+  $Brand: WhiteLabel.Brand
+)
+RETURNS HomeScan.TextHelper AS $Helper
+BEGIN
+  $Helper = CREATE HomeScan."TextHelper" (
+    "Text" = 'https://chatbot.example.com/api',
+    "Text2" = 'demo-api-key-v2',
+    "Text3" = '#94fc1c',
+    "Text4" = 'https://example.com/avatar.png'
+  );
+  RETURN $Helper;
+END;
+/

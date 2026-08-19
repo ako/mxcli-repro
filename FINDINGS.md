@@ -176,3 +176,35 @@ renders. Mendix 10.24.24, DataWidgets from the blank template.
 `./mxcli run --local -p ReproApp.mpr` cold-built and served in about a minute, no
 build errors; `GET http://localhost:8080/` returns **200**. That is the known-good
 starting point every reproduction should be compared against.
+
+---
+
+## 2026-08-19 — ticket 2 (CREATE OR MODIFY rewrites whole flows)
+
+### `CREATE OR MODIFY` on a microflow/nanoflow regenerates every element identity
+
+Confirmed the customer report in `repro2/NOTES.md`. Changing **one** parameter of a
+JavaScript action call inside a nanoflow rewrites the document with 36 of 37 element
+`$ID`/`GUID`s freshly minted (the survivor is the document's own id); the real
+semantic delta is one line. A one-literal change to a microflow does the same: 21 of
+22. The ids are not content-derived — applying a change and reverting it yields a
+semantically identical document with yet another set of new ids.
+
+Consequence: Studio Pro's version-control view shows the entire flow as changed, so
+the changes display is useless on any project where flows are maintained with MDL.
+A fix has to match incoming elements to existing ones and reuse their ids.
+
+*Verified:* `repro2/snapshot.py` diffing `.mxunit` bytes and element id sets across
+four runs; semantic diff taken with `$ID`/`GUID`/`*Pointer` fields stripped. Mendix
+11.13.0, mxcli nightly-20260814-fa886b81.
+
+### `exec` reports writes it did not make
+
+Re-applying a script that already matches the model writes nothing — 0 units change
+and the `.mxunit` mtime is untouched to the nanosecond — but `exec` still prints
+`Modified javascript action: …` and `Replaced nanoflow: …`. The idempotency is real;
+the reporting is not. Anyone judging by console output would wrongly conclude every
+run rewrites the model (and, in this ticket, would wrongly blame no-op runs for the
+version-control churn).
+
+*Verified:* mtime before/after an identical re-run, alongside a 0-unit snapshot diff.

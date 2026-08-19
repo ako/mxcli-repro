@@ -1,0 +1,73 @@
+/**
+ * Forward the AgentSessionID (captured on HomeScan via DL_StartConfigurator)
+ * into the ChatWidget init config, so the widget resumes the conversation the
+ * visitor already had on the partner site instead of starting a new one.
+ */
+CREATE OR MODIFY JAVASCRIPT ACTION MxCore."JS_LoadAiAdvisor" (
+  "chatbotApiUrl": String,
+  "apiKey": String,
+  "toggleButtonColor": String,
+  "agentAvatarUrl": String,
+  "homeScanId": String,
+  "agentSessionId": String
+)
+RETURNS Void
+PLATFORM All
+AS $$
+    const CSS_URL = "https://homezerotech.github.io/files/salesagent/widget.css";
+    const JS_URL = "https://homezerotech.github.io/files/salesagent/widget.js";
+
+    loadCss(CSS_URL, "salesagent-widget-css");
+
+    try {
+        console.log("[ChatWidget Debug] Starting load process...");
+        await loadScript(JS_URL, "salesagent-widget-js");
+
+        const ChatWidgetObj = await waitForGlobal("ChatWidget", 3000);
+
+        if (ChatWidgetObj && typeof ChatWidgetObj.init === "function") {
+            const config = {
+                chatbotApiUrl: chatbotApiUrl,
+                apiKey: apiKey,
+                toggleButtonColor: toggleButtonColor || "#94fc1c",
+                toggleButtonIconColor: "white"
+            };
+
+            if (agentAvatarUrl && agentAvatarUrl.trim() !== "") {
+                config.agentAvatarUrl = agentAvatarUrl;
+            }
+
+            if (homeScanId && homeScanId.trim() !== "") {
+                config.homeScanId = homeScanId;
+            }
+
+            if (agentSessionId && agentSessionId.trim() !== "") {
+                config.sessionId = agentSessionId;
+            }
+
+            console.log("[ChatWidget Debug] Initializing widget with config:", config);
+            ChatWidgetObj.init(config);
+        } else {
+            console.error("[ChatWidget Debug] ChatWidget found but missing .init() method:", ChatWidgetObj);
+        }
+    } catch (error) {
+        console.error("[ChatWidget Debug] Initialization failed:", error);
+    }
+$$;
+
+CREATE OR MODIFY NANOFLOW HomeScan."ONL_AIAdvisor" (
+  $HomeScan: HomeScan.HomeScan,
+  $Brand: WhiteLabel.Brand
+)
+FOLDER '00 General/Microflows'
+BEGIN
+  $TextHelper = CALL MICROFLOW HomeScan."SUB_HomeScan_AiAdvisorSettings" ("HomeScan" = $HomeScan, "Brand" = $Brand);
+  $Variable = CALL JAVASCRIPT ACTION MxCore."JS_LoadAiAdvisor" (
+    "chatbotApiUrl" = $TextHelper/"Text",
+    "apiKey" = $TextHelper/"Text2",
+    "toggleButtonColor" = $Brand/"Name",
+    "agentAvatarUrl" = $TextHelper/"Text4",
+    "homeScanId" = $HomeScan/"HashedID",
+    "agentSessionId" = $HomeScan/"AgentSessionID"
+  );
+END;
